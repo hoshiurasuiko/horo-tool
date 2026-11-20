@@ -1,36 +1,33 @@
+HTML
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ホロスコープ AI精密プロンプト生成ツール</title>
-  
-  <!-- クラシカルな星図・洋書風フォント (Shippori Mincho & Cinzel) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Shippori+Mincho:wght@400;600&display=swap" rel="stylesheet">
+  <title>ホロスコープの重要な感受点ランキング</title>
 
-  <!-- NASA JPL基準の天文学計算ライブラリ (jsdelivr CDN) -->
+  <!-- NASA JPL基準の天文学計算ライブラリ -->
   <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
 
   <style>
+    /* ==========================================
+       1. 全体の配色・デザイン設定（CSS）
+    ========================================== */
     :root {
-      /* クラシカル星図・アンティーク天球儀パレット */
-      --card-bg: rgba(13, 20, 36, 0.88); /* 深夜の天球色（半透明） */
-      --gold-primary: #d4af37;           /* アンティークゴールド */
+      --card-bg: rgba(13, 20, 36, 0.88);
+      --gold-primary: #d4af37;
       --gold-hover: #b89728;
       --gold-light: #f5e7a9;
-      --text-main: #f1f5f9;              /* 星明かりのようなアイボリーホワイト */
-      --text-muted: #94a3b8;             /* くすみシルバー */
-      --border-line: rgba(212, 175, 55, 0.35); /* 繊細な金色の罫線 */
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border-line: rgba(212, 175, 55, 0.35);
       --input-bg: rgba(15, 23, 42, 0.7);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: "Shippori Mincho", "Cinzel", -apple-system, serif;
-      /* 背景にシームレス星空画像を敷き詰め */
+      /* フォント未指定（ブラウザ標準） */
       background-image: url('bg.jpg');
       background-repeat: repeat;
       background-size: 380px 380px;
@@ -47,7 +44,7 @@
       width: 100%;
       max-width: 820px;
       background: var(--card-bg);
-      backdrop-filter: blur(12px); /* 背景の星空をすりガラス状にぼかす */
+      backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       padding: 2.2rem;
       border-radius: 16px;
@@ -56,10 +53,9 @@
     }
 
     h1 {
-      font-family: "Cinzel", "Shippori Mincho", serif;
       font-size: 1.45rem;
       font-weight: 700;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.04em;
       margin-bottom: 0.5rem;
       color: var(--gold-light);
       text-shadow: 0 2px 10px rgba(212, 175, 55, 0.25);
@@ -72,6 +68,7 @@
       color: var(--text-muted);
       margin-top: 0.6rem;
       margin-bottom: 1.8rem;
+      line-height: 1.8;
     }
 
     .section-title {
@@ -123,7 +120,6 @@
       outline: none;
       background: var(--input-bg);
       color: var(--text-main);
-      font-family: inherit;
       flex: 1;
       transition: all 0.2s;
     }
@@ -133,7 +129,6 @@
       box-shadow: 0 0 8px rgba(212, 175, 55, 0.3);
     }
 
-    /* select内のドロップダウン項目の背景 */
     select option {
       background-color: #0f172a;
       color: #f1f5f9;
@@ -164,7 +159,6 @@
       margin-top: 1.2rem;
       box-shadow: 0 4px 15px rgba(212, 175, 55, 0.25);
       transition: all 0.2s ease;
-      font-family: inherit;
     }
 
     .btn:hover {
@@ -195,7 +189,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
       gap: 1.4rem;
-      margin-bottom: 2rem;
+      margin-bottom: 1rem;
     }
 
     table.data-table {
@@ -236,52 +230,20 @@
       gap: 0.6rem;
       margin-top: 0.6rem;
     }
-
-    .output-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 0.6rem;
-    }
-
-    .copy-btn {
-      padding: 0.45rem 1rem;
-      font-size: 0.8rem;
-      background: rgba(212, 175, 55, 0.15);
-      color: var(--gold-light);
-      border: 1px solid var(--border-line);
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
-      font-family: inherit;
-      transition: all 0.2s;
-    }
-
-    .copy-btn:hover {
-      background: var(--gold-primary);
-      color: #0b111e;
-    }
-
-    textarea {
-      width: 100%;
-      height: 300px;
-      padding: 0.9rem;
-      font-family: Consolas, Monaco, "Courier New", monospace;
-      font-size: 0.85rem;
-      border: 1px solid var(--border-line);
-      border-radius: 8px;
-      background: rgba(10, 15, 28, 0.8);
-      color: #e2e8f0;
-      resize: vertical;
-      outline: none;
-    }
   </style>
 </head>
 <body>
 
+  <!-- ==========================================
+       2. 画面の見た目（HTML）
+  ========================================== -->
   <div class="container">
-    <h1>CELESTIAL CHART GENERATOR</h1>
-    <p class="desc">スイス天文暦（NASA JPL準拠）による精密天体計算とAI多角解析プロンプトジェネレーター</p>
+    <h1>ホロスコープの重要な感受点ランキング</h1>
+    <p class="desc">
+      ※試作中です。ご意見はXまでお願いいたします<br>
+      ※スイス天文暦（NASA JPL準拠）使用<br>
+      ※ホロスコープ解読にお役立ていただけますと幸いです。
+    </p>
 
     <div class="section-title">出生データの入力</div>
 
@@ -312,8 +274,9 @@
       </div>
     </div>
 
-    <button class="btn" onclick="executeHoroscope()">ホロスコープ作成 ＆ プロンプト生成</button>
+    <button class="btn" onclick="executeHoroscope()">ホロスコープを作成する</button>
 
+    <!-- 計算結果の表示エリア -->
     <div class="result-wrapper" id="resultWrapper">
       <div class="chart-box">
         <div class="section-title" style="text-align: left;">ネイタルチャート（ホロスコープ円盤）</div>
@@ -342,16 +305,14 @@
           </table>
         </div>
       </div>
-
-      <div class="output-header">
-        <div class="section-title" style="margin-bottom: 0;">AI解析用プロンプト（精密データ埋込済）</div>
-        <button class="copy-btn" onclick="copyPrompt()">プロンプトをコピー</button>
-      </div>
-      <textarea id="promptText" readonly></textarea>
     </div>
   </div>
 
+  <!-- ==========================================
+       3. 計算と描画のプログラム（JavaScript）
+  ========================================== -->
   <script>
+    /* --- 【データ定義】都道府県・12サイン・10天体 --- */
     const PREFECTURES = [
       { name: "北海道 (札幌)", lat: 43.064, lng: 141.347 },
       { name: "青森県", lat: 40.824, lng: 140.740 },
@@ -417,7 +378,6 @@
       { name: "魚座",   symbol: "♓", elem: "水", qual: "柔軟" }
     ];
 
-    /* クラシカルな星図に合わせた天体カラー */
     const PLANET_LIST = [
       { id: "Sun",     name: "太陽",   symbol: "☉", color: "#f59e0b" },
       { id: "Moon",    name: "月",     symbol: "☽", color: "#e2e8f0" },
@@ -431,6 +391,7 @@
       { id: "Pluto",   name: "冥王星", symbol: "♇", color: "#a1a1aa" }
     ];
 
+    /* --- 【初期設定】プルダウンの選択肢を作る処理 --- */
     window.addEventListener("DOMContentLoaded", () => {
       const yearSel = document.getElementById("birthYear");
       for (let y = 2035; y >= 1920; y--) {
@@ -481,6 +442,7 @@
       }
     }
 
+    /* --- 【天体計算】角度・天体位置・ハウスの計算 --- */
     function normDeg(deg) {
       return ((deg % 360) + 360) % 360;
     }
@@ -553,18 +515,10 @@
       const c3  = calcPlacidusCusp(240, 2 / 3, true);
 
       return [
-        c1,
-        c2,
-        c3,
-        normDeg(c10 + 180),
-        normDeg(c11 + 180),
-        normDeg(c12 + 180),
-        normDeg(c1 + 180),
-        normDeg(c2 + 180),
-        normDeg(c3 + 180),
-        c10,
-        c11,
-        c12
+        c1, c2, c3,
+        normDeg(c10 + 180), normDeg(c11 + 180), normDeg(c12 + 180),
+        normDeg(c1 + 180),  normDeg(c2 + 180),  normDeg(c3 + 180),
+        c10, c11, c12
       ];
     }
 
@@ -599,6 +553,7 @@
       return 1;
     }
 
+    /* --- 【メイン実行】ボタンを押したときの全体処理 --- */
     function executeHoroscope() {
       if (typeof Astronomy === "undefined") {
         alert("天文学計算エンジンを読み込み中です。少々お待ちください。");
@@ -617,12 +572,14 @@
       const utcDateNext = new Date(utcDate.getTime() + 60 * 60 * 1000);
       const observer = new Astronomy.Observer(pref.lat, pref.lng, 0);
 
+      // 1. ハウス計算
       const cuspsRaw = calculatePlacidusHouses(utcDate, pref.lat, pref.lng);
       const cusps = cuspsRaw.map((c, idx) => ({
         house: idx + 1,
         ...formatZodiac(c)
       }));
 
+      // 2. 10天体の位置計算
       const planets = PLANET_LIST.map(pt => {
         const lonNow = getApparentTropicalLongitude(pt.id, utcDate, observer);
         const lonNext = getApparentTropicalLongitude(pt.id, utcDateNext, observer);
@@ -643,6 +600,7 @@
         };
       });
 
+      // 3. アスペクト計算（※ここに点数の加算ロジックを追加できます）
       const aspects = [];
       const aspectRules = [
         { name: "Conjunction (合 / 0°)", angle: 0, orb: 7, color: "#60a5fa" },
@@ -672,6 +630,7 @@
         }
       }
 
+      // 4. 4区分・3区分の集計と画面表示
       const elems = { "火": [], "地": [], "風": [], "水": [] };
       const quals = { "活動": [], "固定": [], "柔軟": [] };
       planets.forEach(p => {
@@ -707,13 +666,12 @@
       `).join("");
 
       drawHoroscopeWheel(planets, cuspsRaw, aspects, timeUnknown);
-      buildAiPrompt(y, m, d, h, min, pref.name, timeUnknown, planets, cusps, aspects, elems, quals);
 
       document.getElementById("resultWrapper").style.display = "block";
       document.getElementById("resultWrapper").scrollIntoView({ behavior: "smooth" });
     }
 
-    /* 円盤チャートもゴールドと夜空の線でクラシカルに描画 */
+    /* --- 【円盤描画】ホロスコープの図を描く処理 --- */
     function drawHoroscopeWheel(planets, cuspsRaw, aspects, timeUnknown) {
       const canvas = document.getElementById("horoCanvas");
       const ctx = canvas.getContext("2d");
@@ -728,7 +686,6 @@
       const baseDeg = timeUnknown ? 0 : cuspsRaw[0];
       const toRad = (lon) => ((180 - (lon - baseDeg)) * Math.PI) / 180;
 
-      // 金色の天球同心円
       ctx.strokeStyle = "rgba(212, 175, 55, 0.4)";
       ctx.lineWidth = 1.5;
       [rOuter, rZodiac, rInner].forEach(r => {
@@ -737,7 +694,6 @@
         ctx.stroke();
       });
 
-      // 12サイン分割とゴールドのシンボル
       ZODIAC.forEach((z, idx) => {
         const startLon = idx * 30;
         const rad = toRad(startLon);
@@ -756,7 +712,6 @@
         ctx.fillText(`${z.symbol}`, cx + symR * Math.cos(midRad), cy + symR * Math.sin(midRad));
       });
 
-      // ハウスカスプ線
       if (!timeUnknown) {
         cuspsRaw.forEach((cLon, idx) => {
           const rad = toRad(cLon);
@@ -772,13 +727,12 @@
           let span = nextLon - cLon;
           if (span < 0) span += 360;
           const midRad = toRad(cLon + span / 2);
-          ctx.font = "11px 'Cinzel', serif";
+          ctx.font = "11px sans-serif";
           ctx.fillStyle = "#94a3b8";
           ctx.fillText(`${idx + 1}`, cx + (rInner + 14) * Math.cos(midRad), cy + (rInner + 14) * Math.sin(midRad));
         });
       }
 
-      // アスペクト線
       aspects.forEach(asp => {
         const p1 = planets.find(p => p.name === asp.p1);
         const p2 = planets.find(p => p.name === asp.p2);
@@ -793,14 +747,12 @@
         ctx.stroke();
       });
 
-      // 天体シンボル
       const plotted = [...planets].sort((a, b) => a.total - b.total);
       plotted.forEach((p, idx) => {
         const rad = toRad(p.total);
         const offset = (idx % 2 === 0) ? 0 : -18;
         const pRadius = (rZodiac + rInner) / 2 + 8 + offset;
 
-        // 度数ドット
         ctx.beginPath();
         ctx.arc(cx + rInner * Math.cos(rad), cy + rInner * Math.sin(rad), 3, 0, Math.PI * 2);
         ctx.fillStyle = p.color;
@@ -814,53 +766,6 @@
         ctx.textBaseline = "middle";
         ctx.fillText(`${p.symbol}${p.retroMark}`, x, y);
       });
-    }
-
-    function buildAiPrompt(y, m, d, h, min, prefName, timeUnknown, planets, cusps, aspects, elems, quals) {
-      const timeStr = timeUnknown ? "不明（12:00仮定）" : `${h.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
-      const pLines = planets.map(p => `- ${p.name} (${p.symbol}): ${p.signName} ${p.formatted}${p.retroMark} [${p.houseNum}]`).join("\n");
-      const hLines = timeUnknown ? "- 出生時間不明のためハウス除外" : cusps.map(c => `- 第${c.house}ハウス${c.house===1?"(ASC)":c.house===10?"(MC)":""}: ${c.signName} ${c.formatted}`).join("\n");
-      const aLines = aspects.map(a => `- ${a.p1} × ${a.p2}: ${a.type} (オーブ ${a.orb}°)`).join("\n");
-
-      const prompt = `# 指示
-以下の精密天体計算データ（トロピカル・プラシーダス方式）に基づき、対象者のネイタルチャートを西洋占星術の専門的かつ構造的な視点から徹底解析してください。
-
-# 解析ルール（重要）
-- 誰にでも当てはまる曖昧な慰めや抽象的な一般論（バーナム効果）は一切排除してください。
-- サイン・度数・逆行（R）・ハウス配置・タイトなアスペクトが引き起こす「思考の癖・葛藤構造・職人的な技術適性・生存戦略」を論理的かつ具体的に言語化してください。
-
-# 出生データ
-- 生年月日: ${y}年${m}月${d}日
-- 出生時間: ${timeStr}
-- 出生地: ${prefName}
-
-# 4区分・3区分バランス
-- 火: ${elems["火"].length} / 地: ${elems["地"].length} / 風: ${elems["風"].length} / 水: ${elems["水"].length}
-- 活動: ${quals["活動"].length} / 固定: ${quals["固定"].length} / 柔軟: ${quals["柔軟"].length}
-
-# 天体配置（サイン・度数・逆行・ハウス）
-${pLines}
-
-# ハウス・カスプ（プラシーダス）
-${hLines}
-
-# 主要アスペクト
-${aLines}
-
-# 出力構成
-1. チャート構造の核（ASC・太陽・月の関係性、オーバーロードしているサインやハウスの特徴）
-2. 職能・適性・独自の武器（独立・職人適性、知的生産や造形・技術面での強み）
-3. 内的葛藤とエネルギーの昇華法（ハードアスペクトや逆行天体がもたらす緊張と、その具体的な突破口）
-4. 現実的なライフスタイル・環境構築の指針`;
-
-      document.getElementById("promptText").value = prompt;
-    }
-
-    function copyPrompt() {
-      const txt = document.getElementById("promptText");
-      txt.select();
-      navigator.clipboard.writeText(txt.value);
-      alert("精密AIプロンプトをクリップボードにコピーしました！");
     }
   </script>
 
