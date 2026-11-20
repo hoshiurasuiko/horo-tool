@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ホロスコープ AI精密プロンプト生成ツール</title>
+  
+  <!-- クラシカルな星図・洋書風フォント (Shippori Mincho & Cinzel) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Shippori+Mincho:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- NASA JPL基準の天文学計算ライブラリ (jsdelivr CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
+
+  <style>
+    :root {
+      /* クラシカル星図・アンティーク天球儀パレット */
+      --card-bg: rgba(13, 20, 36, 0.88); /* 深夜の天球色（半透明） */
+      --gold-primary: #d4af37;           /* アンティークゴールド */
+      --gold-hover: #b89728;
+      --gold-light: #f5e7a9;
+      --text-main: #f1f5f9;              /* 星明かりのようなアイボリーホワイト */
+      --text-muted: #94a3b8;             /* くすみシルバー */
+      --border-line: rgba(212, 175, 55, 0.35); /* 繊細な金色の罫線 */
+      --input-bg: rgba(15, 23, 42, 0.7);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Shippori Mincho", "Cinzel", -apple-system, serif;
+      /* 背景にシームレス星空画像を敷き詰め */
+      background-image: url('bg.jpg');
+      background-repeat: repeat;
+      background-size: 380px 380px;
+      background-attachment: fixed;
+      background-color: #0b111e;
+      color: var(--text-main);
+      line-height: 1.7;
+      padding: 2rem 1rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 820px;
+      background: var(--card-bg);
+      backdrop-filter: blur(12px); /* 背景の星空をすりガラス状にぼかす */
+      -webkit-backdrop-filter: blur(12px);
+      padding: 2.2rem;
+      border-radius: 16px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border-line);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    h1 {
+      font-family: "Cinzel", "Shippori Mincho", serif;
+      font-size: 1.45rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.5rem;
+      color: var(--gold-light);
+      text-shadow: 0 2px 10px rgba(212, 175, 55, 0.25);
+      border-bottom: 1px solid var(--border-line);
+      padding-bottom: 0.6rem;
+    }
+
+    p.desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 0.6rem;
+      margin-bottom: 1.8rem;
+    }
+
+    .section-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.8rem;
+      color: var(--gold-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .section-title::before {
+      content: "✦";
+      font-size: 0.75rem;
+      color: var(--gold-primary);
+    }
+
+    .input-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1.2rem;
+      margin-bottom: 1.4rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      color: #cbd5e1;
+    }
+
+    .select-group {
+      display: flex;
+      gap: 0.35rem;
+      align-items: center;
+    }
+
+    select {
+      padding: 0.6rem 0.5rem;
+      border: 1px solid var(--border-line);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+      background: var(--input-bg);
+      color: var(--text-main);
+      font-family: inherit;
+      flex: 1;
+      transition: all 0.2s;
+    }
+
+    select:focus {
+      border-color: var(--gold-light);
+      box-shadow: 0 0 8px rgba(212, 175, 55, 0.3);
+    }
+
+    /* select内のドロップダウン項目の背景 */
+    select option {
+      background-color: #0f172a;
+      color: #f1f5f9;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 0.4rem;
+      cursor: pointer;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 0.85rem;
+      background: linear-gradient(135deg, #b89728 0%, #d4af37 50%, #997b1a 100%);
+      color: #0b111e;
+      font-weight: 700;
+      font-size: 0.98rem;
+      letter-spacing: 0.06em;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 1.2rem;
+      box-shadow: 0 4px 15px rgba(212, 175, 55, 0.25);
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .btn:hover {
+      background: linear-gradient(135deg, #c7a532 0%, #e5c353 50%, #aa8920 100%);
+      box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .result-wrapper {
+      margin-top: 2.2rem;
+      display: none;
+    }
+
+    .chart-box {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    canvas {
+      max-width: 100%;
+      height: auto;
+      border-radius: 50%;
+      background: radial-gradient(circle, #0e172a 0%, #060b14 100%);
+      box-shadow: 0 0 25px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--border-line);
+    }
+
+    .tables-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.4rem;
+      margin-bottom: 2rem;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    table.data-table th, table.data-table td {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 0.55rem 0.7rem;
+      text-align: left;
+    }
+
+    table.data-table th {
+      background: rgba(212, 175, 55, 0.12);
+      color: var(--gold-light);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border-line);
+    }
+
+    .elem-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-line);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 2rem;
+      font-size: 0.85rem;
+    }
+
+    .elem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0.6rem;
+      margin-top: 0.6rem;
+    }
+
+    .output-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.6rem;
+    }
+
+    .copy-btn {
+      padding: 0.45rem 1rem;
+      font-size: 0.8rem;
+      background: rgba(212, 175, 55, 0.15);
+      color: var(--gold-light);
+      border: 1px solid var(--border-line);
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+
+    .copy-btn:hover {
+      background: var(--gold-primary);
+      color: #0b111e;
+    }
+
+    textarea {
+      width: 100%;
+      height: 300px;
+      padding: 0.9rem;
+      font-family: Consolas, Monaco, "Courier New", monospace;
+      font-size: 0.85rem;
+      border: 1px solid var(--border-line);
+      border-radius: 8px;
+      background: rgba(10, 15, 28, 0.8);
+      color: #e2e8f0;
+      resize: vertical;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>CELESTIAL CHART GENERATOR</h1>
+    <p class="desc">スイス天文暦（NASA JPL準拠）による精密天体計算とAI多角解析プロンプトジェネレーター</p>
+
+    <div class="section-title">出生データの入力</div>
+
+    <div class="input-grid">
+      <div class="form-group">
+        <label>生年月日</label>
+        <div class="select-group">
+          <select id="birthYear"></select><span style="font-size: 0.8rem; color: var(--gold-light);">年</span>
+          <select id="birthMonth"></select><span style="font-size: 0.8rem; color: var(--gold-light);">月</span>
+          <select id="birthDay"></select><span style="font-size: 0.8rem; color: var(--gold-light);">日</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>出生時間</label>
+        <div class="select-group">
+          <select id="birthHour"></select><span style="font-size: 0.8rem; color: var(--gold-light);">時</span>
+          <select id="birthMinute"></select><span style="font-size: 0.8rem; color: var(--gold-light);">分</span>
+        </div>
+        <label class="checkbox-label">
+          <input type="checkbox" id="timeUnknown" onchange="toggleTimeUnknown(this)"> 時間不明（12:00・ハウス除外）
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label for="prefecture">出生地（都道府県）</label>
+        <select id="prefecture"></select>
+      </div>
+    </div>
+
+    <button class="btn" onclick="executeHoroscope()">ホロスコープ作成 ＆ プロンプト生成</button>
+
+    <div class="result-wrapper" id="resultWrapper">
+      <div class="chart-box">
+        <div class="section-title" style="text-align: left;">ネイタルチャート（ホロスコープ円盤）</div>
+        <canvas id="horoCanvas" width="600" height="600"></canvas>
+      </div>
+
+      <div class="elem-box" id="elementBox"></div>
+
+      <div class="tables-grid">
+        <div>
+          <div class="section-title">天体位置（サイン・度数・ハウス）</div>
+          <table class="data-table">
+            <thead>
+              <tr><th>天体</th><th>サイン</th><th>度数</th><th>ハウス</th></tr>
+            </thead>
+            <tbody id="planetTableBody"></tbody>
+          </table>
+        </div>
+        <div>
+          <div class="section-title">ハウス・カスプ（プラシーダス）</div>
+          <table class="data-table">
+            <thead>
+              <tr><th>ハウス</th><th>サイン</th><th>度数</th></tr>
+            </thead>
+            <tbody id="houseTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="output-header">
+        <div class="section-title" style="margin-bottom: 0;">AI解析用プロンプト（精密データ埋込済）</div>
+        <button class="copy-btn" onclick="copyPrompt()">プロンプトをコピー</button>
+      </div>
+      <textarea id="promptText" readonly></textarea>
+    </div>
+  </div>
+
+  <script>
+    const PREFECTURES = [
+      { name: "北海道 (札幌)", lat: 43.064, lng: 141.347 },
+      { name: "青森県", lat: 40.824, lng: 140.740 },
+      { name: "岩手県 (盛岡)", lat: 39.704, lng: 141.153 },
+      { name: "宮城県 (仙台)", lat: 38.269, lng: 140.872 },
+      { name: "秋田県", lat: 39.719, lng: 140.103 },
+      { name: "山形県", lat: 38.241, lng: 140.363 },
+      { name: "福島県", lat: 37.750, lng: 140.468 },
+      { name: "茨城県 (水戸)", lat: 36.341, lng: 140.447 },
+      { name: "栃木県 (宇都宮)", lat: 36.566, lng: 139.884 },
+      { name: "群馬県 (前橋)", lat: 36.391, lng: 139.061 },
+      { name: "埼玉県", lat: 35.857, lng: 139.649 },
+      { name: "千葉県", lat: 35.605, lng: 140.123 },
+      { name: "東京都", lat: 35.689, lng: 139.692 },
+      { name: "神奈川県 (横浜)", lat: 35.448, lng: 139.643 },
+      { name: "新潟県", lat: 37.902, lng: 139.024 },
+      { name: "富山県", lat: 36.695, lng: 137.211 },
+      { name: "石川県 (金沢)", lat: 36.594, lng: 136.626 },
+      { name: "福井県", lat: 36.065, lng: 136.222 },
+      { name: "山梨県 (甲府)", lat: 35.664, lng: 138.568 },
+      { name: "長野県", lat: 36.651, lng: 138.181 },
+      { name: "岐阜県", lat: 35.391, lng: 136.722 },
+      { name: "静岡県", lat: 34.977, lng: 138.383 },
+      { name: "愛知県 (名古屋)", lat: 35.180, lng: 136.907 },
+      { name: "三重県 (津)", lat: 34.730, lng: 136.509 },
+      { name: "滋賀県 (大津)", lat: 35.004, lng: 135.868 },
+      { name: "京都府", lat: 35.021, lng: 135.756 },
+      { name: "大阪府", lat: 34.686, lng: 135.520 },
+      { name: "兵庫県 (神戸)", lat: 34.691, lng: 135.183 },
+      { name: "奈良県", lat: 34.685, lng: 135.833 },
+      { name: "和歌山県", lat: 34.226, lng: 135.168 },
+      { name: "鳥取県", lat: 35.504, lng: 134.238 },
+      { name: "島根県 (松江)", lat: 35.472, lng: 133.051 },
+      { name: "岡山県 (岡山市)", lat: 34.662, lng: 133.935 },
+      { name: "広島県", lat: 34.396, lng: 132.459 },
+      { name: "山口県", lat: 34.186, lng: 131.471 },
+      { name: "徳島県", lat: 34.066, lng: 134.559 },
+      { name: "香川県 (高松)", lat: 34.340, lng: 134.043 },
+      { name: "愛媛県 (松山)", lat: 33.842, lng: 132.766 },
+      { name: "高知県", lat: 33.560, lng: 133.531 },
+      { name: "福岡県", lat: 33.606, lng: 130.418 },
+      { name: "佐賀県", lat: 33.249, lng: 130.299 },
+      { name: "長崎県", lat: 32.745, lng: 129.874 },
+      { name: "熊本県", lat: 32.790, lng: 130.742 },
+      { name: "大分県", lat: 33.238, lng: 131.613 },
+      { name: "宮崎県", lat: 31.911, lng: 131.424 },
+      { name: "鹿児島県", lat: 31.560, lng: 130.558 },
+      { name: "沖縄県 (那覇)", lat: 26.213, lng: 127.681 }
+    ];
+
+    const ZODIAC = [
+      { name: "牡羊座", symbol: "♈", elem: "火", qual: "活動" },
+      { name: "牡牛座", symbol: "♉", elem: "地", qual: "固定" },
+      { name: "双子座", symbol: "♊", elem: "風", qual: "柔軟" },
+      { name: "蟹座",   symbol: "♋", elem: "水", qual: "活動" },
+      { name: "獅子座", symbol: "♌", elem: "火", qual: "固定" },
+      { name: "乙女座", symbol: "♍", elem: "地", qual: "柔軟" },
+      { name: "天秤座", symbol: "♎", elem: "風", qual: "活動" },
+      { name: "蠍座",   symbol: "♏", elem: "水", qual: "固定" },
+      { name: "射手座", symbol: "♐", elem: "火", qual: "柔軟" },
+      { name: "山羊座", symbol: "♑", elem: "地", qual: "活動" },
+      { name: "水瓶座", symbol: "♒", elem: "風", qual: "固定" },
+      { name: "魚座",   symbol: "♓", elem: "水", qual: "柔軟" }
+    ];
+
+    /* クラシカルな星図に合わせた天体カラー */
+    const PLANET_LIST = [
+      { id: "Sun",     name: "太陽",   symbol: "☉", color: "#f59e0b" },
+      { id: "Moon",    name: "月",     symbol: "☽", color: "#e2e8f0" },
+      { id: "Mercury", name: "水星",   symbol: "☿", color: "#38bdf8" },
+      { id: "Venus",   name: "金星",   symbol: "♀", color: "#f472b6" },
+      { id: "Mars",    name: "火星",   symbol: "♂", color: "#f87171" },
+      { id: "Jupiter", name: "木星",   symbol: "♃", color: "#c084fc" },
+      { id: "Saturn",  name: "土星",   symbol: "♄", color: "#cbd5e1" },
+      { id: "Uranus",  name: "天王星", symbol: "♅", color: "#67e8f9" },
+      { id: "Neptune", name: "海王星", symbol: "♆", color: "#60a5fa" },
+      { id: "Pluto",   name: "冥王星", symbol: "♇", color: "#a1a1aa" }
+    ];
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const yearSel = document.getElementById("birthYear");
+      for (let y = 2035; y >= 1920; y--) {
+        const opt = new Option(y, y);
+        if (y === 1986) opt.selected = true;
+        yearSel.add(opt);
+      }
+      const monthSel = document.getElementById("birthMonth");
+      for (let m = 1; m <= 12; m++) {
+        const opt = new Option(m, m);
+        if (m === 11) opt.selected = true;
+        monthSel.add(opt);
+      }
+      const daySel = document.getElementById("birthDay");
+      for (let d = 1; d <= 31; d++) {
+        const opt = new Option(d, d);
+        if (d === 17) opt.selected = true;
+        daySel.add(opt);
+      }
+      const hourSel = document.getElementById("birthHour");
+      for (let h = 0; h < 24; h++) {
+        const v = h.toString().padStart(2, "0");
+        const opt = new Option(v, v);
+        if (h === 4) opt.selected = true;
+        hourSel.add(opt);
+      }
+      const minSel = document.getElementById("birthMinute");
+      for (let min = 0; min < 60; min++) {
+        const v = min.toString().padStart(2, "0");
+        const opt = new Option(v, v);
+        if (min === 21) opt.selected = true;
+        minSel.add(opt);
+      }
+      const prefSel = document.getElementById("prefecture");
+      PREFECTURES.forEach((p, idx) => {
+        const opt = new Option(p.name, idx);
+        if (p.name.includes("岡山県")) opt.selected = true;
+        prefSel.add(opt);
+      });
+    });
+
+    function toggleTimeUnknown(cb) {
+      document.getElementById("birthHour").disabled = cb.checked;
+      document.getElementById("birthMinute").disabled = cb.checked;
+      if (cb.checked) {
+        document.getElementById("birthHour").value = "12";
+        document.getElementById("birthMinute").value = "00";
+      }
+    }
+
+    function normDeg(deg) {
+      return ((deg % 360) + 360) % 360;
+    }
+
+    function getApparentTropicalLongitude(bodyId, dateObj, observer) {
+      const time = Astronomy.MakeTime(dateObj);
+      if (bodyId === "Sun") {
+        return Astronomy.SunPosition(time).elon;
+      }
+      if (bodyId === "Moon") {
+        return Astronomy.EclipticGeoMoon(time).lon;
+      }
+      const equ = Astronomy.Equator(Astronomy.Body[bodyId], time, observer, true, true);
+      const raRad = equ.ra * 15 * (Math.PI / 180);
+      const decRad = equ.dec * (Math.PI / 180);
+
+      const T = (time.ut) / 36525.0;
+      const epsDeg = 23.4392911 - 0.0130042 * T;
+      const epsRad = epsDeg * (Math.PI / 180);
+
+      const y = Math.sin(raRad) * Math.cos(epsRad) + Math.tan(decRad) * Math.sin(epsRad);
+      const x = Math.cos(raRad);
+      let lonDeg = Math.atan2(y, x) * (180 / Math.PI);
+      return normDeg(lonDeg);
+    }
+
+    function calculatePlacidusHouses(dateObj, latDeg, lngDeg) {
+      const time = Astronomy.MakeTime(dateObj);
+      const gmstHours = Astronomy.SiderealTime(time);
+      const ramcDeg = normDeg(gmstHours * 15 + lngDeg);
+      const ramcRad = ramcDeg * (Math.PI / 180);
+
+      const T = (time.ut) / 36525.0;
+      const epsDeg = 23.4392911 - 0.0130042 * T;
+      const epsRad = epsDeg * (Math.PI / 180);
+      const latRad = latDeg * (Math.PI / 180);
+
+      let mcDeg = Math.atan2(Math.sin(ramcRad), Math.cos(ramcRad) * Math.cos(epsRad)) * (180 / Math.PI);
+      mcDeg = normDeg(mcDeg);
+
+      let ascDeg = Math.atan2(
+        Math.cos(ramcRad),
+        -Math.sin(ramcRad) * Math.cos(epsRad) - Math.tan(latRad) * Math.sin(epsRad)
+      ) * (180 / Math.PI);
+      ascDeg = normDeg(ascDeg);
+
+      function calcPlacidusCusp(offsetDeg, f, isNocturnal) {
+        let ra = normDeg(ramcDeg + offsetDeg) * (Math.PI / 180);
+        for (let i = 0; i < 15; i++) {
+          let sinDec = Math.sin(epsRad) * Math.sin(ra);
+          let dec = Math.asin(Math.max(-0.9999, Math.min(0.9999, sinDec)));
+          let tanProd = Math.tan(latRad) * Math.tan(dec);
+          tanProd = Math.max(-0.9999, Math.min(0.9999, tanProd));
+          let ad = Math.asin(tanProd);
+          let semiArc = isNocturnal ? (Math.PI / 2 - ad) : (Math.PI / 2 + ad);
+          let targetRA = isNocturnal
+            ? (ramcRad + Math.PI) + f * semiArc
+            : ramcRad + f * semiArc;
+          ra = targetRA;
+        }
+        let lon = Math.atan2(Math.sin(ra), Math.cos(ra) * Math.cos(epsRad)) * (180 / Math.PI);
+        return normDeg(lon);
+      }
+
+      const c10 = mcDeg;
+      const c11 = calcPlacidusCusp(30, 1 / 3, false);
+      const c12 = calcPlacidusCusp(60, 2 / 3, false);
+      const c1  = ascDeg;
+      const c2  = calcPlacidusCusp(210, 1 / 3, true);
+      const c3  = calcPlacidusCusp(240, 2 / 3, true);
+
+      return [
+        c1,
+        c2,
+        c3,
+        normDeg(c10 + 180),
+        normDeg(c11 + 180),
+        normDeg(c12 + 180),
+        normDeg(c1 + 180),
+        normDeg(c2 + 180),
+        normDeg(c3 + 180),
+        c10,
+        c11,
+        c12
+      ];
+    }
+
+    function formatZodiac(lon) {
+      const d = normDeg(lon);
+      const signIdx = Math.floor(d / 30);
+      const degInSign = Math.floor(d % 30);
+      const minInSign = Math.floor(((d % 30) - degInSign) * 60);
+      return {
+        signIdx,
+        signName: ZODIAC[signIdx].name,
+        symbol: ZODIAC[signIdx].symbol,
+        elem: ZODIAC[signIdx].elem,
+        qual: ZODIAC[signIdx].qual,
+        deg: degInSign,
+        min: minInSign,
+        formatted: `${degInSign}°${minInSign.toString().padStart(2, "0")}′`,
+        total: d
+      };
+    }
+
+    function findHouse(planetLon, cusps) {
+      for (let i = 0; i < 12; i++) {
+        const start = cusps[i];
+        const end = cusps[(i + 1) % 12];
+        if (start < end) {
+          if (planetLon >= start && planetLon < end) return i + 1;
+        } else {
+          if (planetLon >= start || planetLon < end) return i + 1;
+        }
+      }
+      return 1;
+    }
+
+    function executeHoroscope() {
+      if (typeof Astronomy === "undefined") {
+        alert("天文学計算エンジンを読み込み中です。少々お待ちください。");
+        return;
+      }
+
+      const y = parseInt(document.getElementById("birthYear").value);
+      const m = parseInt(document.getElementById("birthMonth").value);
+      const d = parseInt(document.getElementById("birthDay").value);
+      const h = parseInt(document.getElementById("birthHour").value);
+      const min = parseInt(document.getElementById("birthMinute").value);
+      const pref = PREFECTURES[document.getElementById("prefecture").value];
+      const timeUnknown = document.getElementById("timeUnknown").checked;
+
+      const utcDate = new Date(Date.UTC(y, m - 1, d, h - 9, min, 0));
+      const utcDateNext = new Date(utcDate.getTime() + 60 * 60 * 1000);
+      const observer = new Astronomy.Observer(pref.lat, pref.lng, 0);
+
+      const cuspsRaw = calculatePlacidusHouses(utcDate, pref.lat, pref.lng);
+      const cusps = cuspsRaw.map((c, idx) => ({
+        house: idx + 1,
+        ...formatZodiac(c)
+      }));
+
+      const planets = PLANET_LIST.map(pt => {
+        const lonNow = getApparentTropicalLongitude(pt.id, utcDate, observer);
+        const lonNext = getApparentTropicalLongitude(pt.id, utcDateNext, observer);
+        let diff = lonNext - lonNow;
+        if (diff > 180) diff -= 360;
+        if (diff < -180) diff += 360;
+        const isRetro = (pt.id !== "Sun" && pt.id !== "Moon" && diff < 0);
+
+        const z = formatZodiac(lonNow);
+        const houseNum = timeUnknown ? "-" : `${findHouse(lonNow, cuspsRaw)}ハウス`;
+
+        return {
+          ...pt,
+          ...z,
+          isRetro,
+          retroMark: isRetro ? "R" : "",
+          houseNum
+        };
+      });
+
+      const aspects = [];
+      const aspectRules = [
+        { name: "Conjunction (合 / 0°)", angle: 0, orb: 7, color: "#60a5fa" },
+        { name: "Opposition (衝 / 180°)", angle: 180, orb: 7, color: "#f87171" },
+        { name: "Trine (三分 / 120°)", angle: 120, orb: 6, color: "#4ade80" },
+        { name: "Square (四分 / 90°)", angle: 90, orb: 6, color: "#fb923c" },
+        { name: "Sextile (六分 / 60°)", angle: 60, orb: 4.5, color: "#38bdf8" }
+      ];
+
+      for (let i = 0; i < planets.length; i++) {
+        for (let j = i + 1; j < planets.length; j++) {
+          let diff = Math.abs(planets[i].total - planets[j].total);
+          if (diff > 180) diff = 360 - diff;
+          for (const r of aspectRules) {
+            const orbVal = Math.abs(diff - r.angle);
+            if (orbVal <= r.orb) {
+              aspects.push({
+                p1: planets[i].name,
+                p2: planets[j].name,
+                type: r.name,
+                orb: orbVal.toFixed(1),
+                color: r.color
+              });
+              break;
+            }
+          }
+        }
+      }
+
+      const elems = { "火": [], "地": [], "風": [], "水": [] };
+      const quals = { "活動": [], "固定": [], "柔軟": [] };
+      planets.forEach(p => {
+        elems[p.elem].push(`${p.symbol}${p.name}`);
+        quals[p.qual].push(`${p.symbol}${p.name}`);
+      });
+
+      document.getElementById("elementBox").innerHTML = `
+        <strong style="color: var(--gold-light);">✦ 4区分（エレメント）＆ 3区分（クオリティ）</strong>
+        <div class="elem-grid">
+          <div>🔥 <strong>火 (${elems["火"].length}):</strong> ${elems["火"].join(" ") || "なし"}</div>
+          <div>🌱 <strong>地 (${elems["地"].length}):</strong> ${elems["地"].join(" ") || "なし"}</div>
+          <div>🍃 <strong>風 (${elems["風"].length}):</strong> ${elems["風"].join(" ") || "なし"}</div>
+          <div>💧 <strong>水 (${elems["水"].length}):</strong> ${elems["水"].join(" ") || "なし"}</div>
+        </div>
+      `;
+
+      document.getElementById("planetTableBody").innerHTML = planets.map(p => `
+        <tr>
+          <td><strong style="color:${p.color};">${p.symbol} ${p.name}</strong></td>
+          <td>${ZODIAC[p.signIdx].symbol} ${p.signName}</td>
+          <td>${p.formatted} <span style="color:#f87171; font-weight:bold;">${p.retroMark}</span></td>
+          <td>${p.houseNum}</td>
+        </tr>
+      `).join("");
+
+      document.getElementById("houseTableBody").innerHTML = cusps.map(c => `
+        <tr>
+          <td><strong>${c.house}ハウス${c.house === 1 ? " (ASC)" : c.house === 10 ? " (MC)" : ""}</strong></td>
+          <td>${c.symbol} ${c.signName}</td>
+          <td>${c.formatted}</td>
+        </tr>
+      `).join("");
+
+      drawHoroscopeWheel(planets, cuspsRaw, aspects, timeUnknown);
+      buildAiPrompt(y, m, d, h, min, pref.name, timeUnknown, planets, cusps, aspects, elems, quals);
+
+      document.getElementById("resultWrapper").style.display = "block";
+      document.getElementById("resultWrapper").scrollIntoView({ behavior: "smooth" });
+    }
+
+    /* 円盤チャートもゴールドと夜空の線でクラシカルに描画 */
+    function drawHoroscopeWheel(planets, cuspsRaw, aspects, timeUnknown) {
+      const canvas = document.getElementById("horoCanvas");
+      const ctx = canvas.getContext("2d");
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const rOuter = 265;
+      const rZodiac = 215;
+      const rInner = 145;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const baseDeg = timeUnknown ? 0 : cuspsRaw[0];
+      const toRad = (lon) => ((180 - (lon - baseDeg)) * Math.PI) / 180;
+
+      // 金色の天球同心円
+      ctx.strokeStyle = "rgba(212, 175, 55, 0.4)";
+      ctx.lineWidth = 1.5;
+      [rOuter, rZodiac, rInner].forEach(r => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+
+      // 12サイン分割とゴールドのシンボル
+      ZODIAC.forEach((z, idx) => {
+        const startLon = idx * 30;
+        const rad = toRad(startLon);
+        ctx.beginPath();
+        ctx.moveTo(cx + rZodiac * Math.cos(rad), cy + rZodiac * Math.sin(rad));
+        ctx.lineTo(cx + rOuter * Math.cos(rad), cy + rOuter * Math.sin(rad));
+        ctx.strokeStyle = "rgba(212, 175, 55, 0.25)";
+        ctx.stroke();
+
+        const midRad = toRad(startLon + 15);
+        const symR = (rOuter + rZodiac) / 2;
+        ctx.font = "bold 16px sans-serif";
+        ctx.fillStyle = "#f5e7a9";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`${z.symbol}`, cx + symR * Math.cos(midRad), cy + symR * Math.sin(midRad));
+      });
+
+      // ハウスカスプ線
+      if (!timeUnknown) {
+        cuspsRaw.forEach((cLon, idx) => {
+          const rad = toRad(cLon);
+          const isAxis = (idx === 0 || idx === 3 || idx === 6 || idx === 9);
+          ctx.beginPath();
+          ctx.moveTo(cx + rInner * Math.cos(rad), cy + rInner * Math.sin(rad));
+          ctx.lineTo(cx + rZodiac * Math.cos(rad), cy + rZodiac * Math.sin(rad));
+          ctx.strokeStyle = isAxis ? "#d4af37" : "rgba(255, 255, 255, 0.18)";
+          ctx.lineWidth = isAxis ? 2 : 1;
+          ctx.stroke();
+
+          const nextLon = cuspsRaw[(idx + 1) % 12];
+          let span = nextLon - cLon;
+          if (span < 0) span += 360;
+          const midRad = toRad(cLon + span / 2);
+          ctx.font = "11px 'Cinzel', serif";
+          ctx.fillStyle = "#94a3b8";
+          ctx.fillText(`${idx + 1}`, cx + (rInner + 14) * Math.cos(midRad), cy + (rInner + 14) * Math.sin(midRad));
+        });
+      }
+
+      // アスペクト線
+      aspects.forEach(asp => {
+        const p1 = planets.find(p => p.name === asp.p1);
+        const p2 = planets.find(p => p.name === asp.p2);
+        if (!p1 || !p2) return;
+        const r1 = toRad(p1.total);
+        const r2 = toRad(p2.total);
+        ctx.strokeStyle = asp.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx + rInner * Math.cos(r1), cy + rInner * Math.sin(r1));
+        ctx.lineTo(cx + rInner * Math.cos(r2), cy + rInner * Math.sin(r2));
+        ctx.stroke();
+      });
+
+      // 天体シンボル
+      const plotted = [...planets].sort((a, b) => a.total - b.total);
+      plotted.forEach((p, idx) => {
+        const rad = toRad(p.total);
+        const offset = (idx % 2 === 0) ? 0 : -18;
+        const pRadius = (rZodiac + rInner) / 2 + 8 + offset;
+
+        // 度数ドット
+        ctx.beginPath();
+        ctx.arc(cx + rInner * Math.cos(rad), cy + rInner * Math.sin(rad), 3, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+
+        const x = cx + pRadius * Math.cos(rad);
+        const y = cy + pRadius * Math.sin(rad);
+        ctx.font = "bold 15px sans-serif";
+        ctx.fillStyle = p.color;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`${p.symbol}${p.retroMark}`, x, y);
+      });
+    }
+
+    function buildAiPrompt(y, m, d, h, min, prefName, timeUnknown, planets, cusps, aspects, elems, quals) {
+      const timeStr = timeUnknown ? "不明（12:00仮定）" : `${h.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
+      const pLines = planets.map(p => `- ${p.name} (${p.symbol}): ${p.signName} ${p.formatted}${p.retroMark} [${p.houseNum}]`).join("\n");
+      const hLines = timeUnknown ? "- 出生時間不明のためハウス除外" : cusps.map(c => `- 第${c.house}ハウス${c.house===1?"(ASC)":c.house===10?"(MC)":""}: ${c.signName} ${c.formatted}`).join("\n");
+      const aLines = aspects.map(a => `- ${a.p1} × ${a.p2}: ${a.type} (オーブ ${a.orb}°)`).join("\n");
+
+      const prompt = `# 指示
+以下の精密天体計算データ（トロピカル・プラシーダス方式）に基づき、対象者のネイタルチャートを西洋占星術の専門的かつ構造的な視点から徹底解析してください。
+
+# 解析ルール（重要）
+- 誰にでも当てはまる曖昧な慰めや抽象的な一般論（バーナム効果）は一切排除してください。
+- サイン・度数・逆行（R）・ハウス配置・タイトなアスペクトが引き起こす「思考の癖・葛藤構造・職人的な技術適性・生存戦略」を論理的かつ具体的に言語化してください。
+
+# 出生データ
+- 生年月日: ${y}年${m}月${d}日
+- 出生時間: ${timeStr}
+- 出生地: ${prefName}
+
+# 4区分・3区分バランス
+- 火: ${elems["火"].length} / 地: ${elems["地"].length} / 風: ${elems["風"].length} / 水: ${elems["水"].length}
+- 活動: ${quals["活動"].length} / 固定: ${quals["固定"].length} / 柔軟: ${quals["柔軟"].length}
+
+# 天体配置（サイン・度数・逆行・ハウス）
+${pLines}
+
+# ハウス・カスプ（プラシーダス）
+${hLines}
+
+# 主要アスペクト
+${aLines}
+
+# 出力構成
+1. チャート構造の核（ASC・太陽・月の関係性、オーバーロードしているサインやハウスの特徴）
+2. 職能・適性・独自の武器（独立・職人適性、知的生産や造形・技術面での強み）
+3. 内的葛藤とエネルギーの昇華法（ハードアスペクトや逆行天体がもたらす緊張と、その具体的な突破口）
+4. 現実的なライフスタイル・環境構築の指針`;
+
+      document.getElementById("promptText").value = prompt;
+    }
+
+    function copyPrompt() {
+      const txt = document.getElementById("promptText");
+      txt.select();
+      navigator.clipboard.writeText(txt.value);
+      alert("精密AIプロンプトをクリップボードにコピーしました！");
+    }
+  </script>
+
+</body>
+</html>
