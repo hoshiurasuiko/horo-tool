@@ -26,7 +26,6 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      /* フォント未指定（ブラウザ標準） */
       background-image: url('bg.jpg');
       background-repeat: repeat;
       background-size: 380px 380px;
@@ -71,8 +70,8 @@
     }
 
     .section-title {
-      font-size: 0.95rem;
-      font-weight: 600;
+      font-size: 0.98rem;
+      font-weight: 700;
       letter-spacing: 0.05em;
       margin-bottom: 0.8rem;
       color: var(--gold-primary);
@@ -169,6 +168,85 @@
     .result-wrapper {
       margin-top: 2.2rem;
       display: none;
+    }
+
+    /* ランキング表示用のスタイル */
+    .ranking-box {
+      margin-bottom: 2.4rem;
+    }
+
+    table.ranking-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      background: rgba(15, 23, 42, 0.65);
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border-line);
+    }
+
+    table.ranking-table th, table.ranking-table td {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 0.65rem 0.75rem;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    table.ranking-table th {
+      background: rgba(212, 175, 55, 0.16);
+      color: var(--gold-light);
+      font-weight: 700;
+      border-bottom: 1px solid var(--border-line);
+    }
+
+    .rank-badge {
+      display: inline-block;
+      min-width: 2.2rem;
+      text-align: center;
+      font-weight: 700;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+    }
+    .rank-1 { background: rgba(212, 175, 55, 0.3); color: var(--gold-light); border: 1px solid var(--gold-primary); }
+    .rank-2 { background: rgba(148, 163, 184, 0.25); color: #f8fafc; }
+    .rank-3 { background: rgba(180, 83, 9, 0.25); color: #fed7aa; }
+
+    .score-val {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--gold-light);
+      white-space: nowrap;
+    }
+
+    .breakdown-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .tag-plus {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #bae6fd;
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.78rem;
+    }
+
+    .tag-minus {
+      background: rgba(248, 113, 113, 0.15);
+      border: 1px solid rgba(248, 113, 113, 0.35);
+      color: #fecaca;
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.78rem;
+    }
+
+    .tag-none {
+      color: var(--text-muted);
+      font-size: 0.78rem;
     }
 
     .chart-box {
@@ -273,17 +351,37 @@
       </div>
     </div>
 
-    <button class="btn" onclick="executeHoroscope()">ホロスコープを作成する</button>
+    <button class="btn" onclick="executeHoroscope()">ホロスコープ ＆ ランキングを作成する</button>
 
     <!-- 計算結果の表示エリア -->
     <div class="result-wrapper" id="resultWrapper">
+
+      <!-- ★一番最初に出る重要度ランキング表 -->
+      <div class="ranking-box">
+        <div class="section-title">重要な感受点ランキング（点数・内訳）</div>
+        <table class="ranking-table">
+          <thead>
+            <tr>
+              <th style="width: 60px;">順位</th>
+              <th style="width: 150px;">天体（サイン）</th>
+              <th style="width: 85px;">合計点</th>
+              <th>点数の内訳</th>
+            </tr>
+          </thead>
+          <tbody id="rankingTableBody"></tbody>
+        </table>
+      </div>
+
+      <!-- ホロスコープ円盤 -->
       <div class="chart-box">
         <div class="section-title" style="text-align: left;">ネイタルチャート（ホロスコープ円盤）</div>
         <canvas id="horoCanvas" width="600" height="600"></canvas>
       </div>
 
+      <!-- 4区分・3区分 -->
       <div class="elem-box" id="elementBox"></div>
 
+      <!-- 天体位置とハウス一覧 -->
       <div class="tables-grid">
         <div>
           <div class="section-title">天体位置（サイン・度数・ハウス）</div>
@@ -304,6 +402,7 @@
           </table>
         </div>
       </div>
+
     </div>
   </div>
 
@@ -311,7 +410,43 @@
        3. 計算と描画のプログラム（JavaScript）
   ========================================== -->
   <script>
-    /* --- 【データ定義】都道府県・12サイン・10天体 --- */
+    /* ========================================================
+       ★【配点・オーブの設定ルール】（ここを変えると点数が変わります）
+    ======================================================== */
+    // 1. 品位（ディグニティ）の対応表と点数
+    //    ※ドミサイル(ルーラー): +2 / デトリメント: -2 / エグザルテーション: +1 / フォール: -1
+    const DIGNITY_RULES = {
+      Sun:     { domicile: ["獅子座"],           detriment: ["水瓶座"],           exaltation: ["牡羊座"], fall: ["天秤座"] },
+      Moon:    { domicile: ["蟹座"],             detriment: ["山羊座"],           exaltation: ["牡牛座"], fall: ["蠍座"] },
+      Mercury: { domicile: ["双子座", "乙女座"], detriment: ["射手座", "魚座"],   exaltation: [],         fall: [] }, // 乙女座はルーラー(+2)優先
+      Venus:   { domicile: ["牡牛座", "天秤座"], detriment: ["蠍座", "牡羊座"],   exaltation: ["魚座"],   fall: ["乙女座"] },
+      Mars:    { domicile: ["牡羊座"],           detriment: ["天秤座"],           exaltation: ["山羊座"], fall: ["蟹座"] },
+      Jupiter: { domicile: ["射手座"],           detriment: ["双子座"],           exaltation: ["蟹座"],   fall: ["山羊座"] },
+      Saturn:  { domicile: ["山羊座"],           detriment: ["蟹座"],             exaltation: ["天秤座"], fall: ["牡羊座"] },
+      Uranus:  { domicile: ["水瓶座"],           detriment: ["獅子座"],           exaltation: [],         fall: [] },
+      Neptune: { domicile: ["魚座"],             detriment: ["乙女座"],           exaltation: [],         fall: [] },
+      Pluto:   { domicile: ["蠍座"],             detriment: ["牡牛座"],           exaltation: [],         fall: [] }
+    };
+
+    // 2. アスペクトの種類・最大オーブ・基本点（0度〜1度未満のときの点数）
+    //    ※オーブが1度広がるごとに 0.25点 ずつ減点されます
+    const ASPECT_RULES = [
+      { shortName: "合(0°)",      angle: 0,   maxOrb: 6.0, baseScore: 2.0,  color: "#60a5fa" },
+      { shortName: "衝(180°)",    angle: 180, maxOrb: 6.0, baseScore: 2.0,  color: "#f87171" },
+      { shortName: "三分(120°)",  angle: 120, maxOrb: 4.0, baseScore: 1.5,  color: "#4ade80" },
+      { shortName: "四分(90°)",   angle: 90,  maxOrb: 4.0, baseScore: 1.5,  color: "#fb923c" },
+      { shortName: "六分(60°)",   angle: 60,  maxOrb: 4.0, baseScore: 1.5,  color: "#38bdf8" }
+    ];
+
+    // オーブに応じた点数を計算する関数（1度ごとに -0.25点）
+    function calcAspectScore(baseScore, orbVal) {
+      // ちょうど6.00度や4.00度の端数を正しく段階分けする処理
+      const step = (orbVal >= 6.0) ? 5 : (orbVal >= 4.0 && baseScore === 1.5) ? 3 : Math.floor(orbVal);
+      return baseScore - (step * 0.25);
+    }
+
+
+    /* --- 【基礎データ定義】都道府県・12サイン・10天体 --- */
     const PREFECTURES = [
       { name: "北海道 (札幌)", lat: 43.064, lng: 141.347 },
       { name: "青森県", lat: 40.824, lng: 140.740 },
@@ -448,12 +583,9 @@
 
     function getApparentTropicalLongitude(bodyId, dateObj, observer) {
       const time = Astronomy.MakeTime(dateObj);
-      if (bodyId === "Sun") {
-        return Astronomy.SunPosition(time).elon;
-      }
-      if (bodyId === "Moon") {
-        return Astronomy.EclipticGeoMoon(time).lon;
-      }
+      if (bodyId === "Sun") return Astronomy.SunPosition(time).elon;
+      if (bodyId === "Moon") return Astronomy.EclipticGeoMoon(time).lon;
+
       const equ = Astronomy.Equator(Astronomy.Body[bodyId], time, observer, true, true);
       const raRad = equ.ra * 15 * (Math.PI / 180);
       const decRad = equ.dec * (Math.PI / 180);
@@ -578,7 +710,7 @@
         ...formatZodiac(c)
       }));
 
-      // 2. 10天体の位置計算
+      // 2. 10天体の位置計算 ＆ 品位（ディグニティ）の初期スコア判定
       const planets = PLANET_LIST.map(pt => {
         const lonNow = getApparentTropicalLongitude(pt.id, utcDate, observer);
         const lonNext = getApparentTropicalLongitude(pt.id, utcDateNext, observer);
@@ -590,55 +722,108 @@
         const z = formatZodiac(lonNow);
         const houseNum = timeUnknown ? "-" : `${findHouse(lonNow, cuspsRaw)}ハウス`;
 
+        // 品位スコアと内訳ラベルの初期化
+        let score = 0;
+        const breakdown = [];
+        const dig = DIGNITY_RULES[pt.id];
+        if (dig) {
+          if (dig.domicile.includes(z.signName)) {
+            score += 2;
+            breakdown.push({ text: "ルーラー +2", isPlus: true });
+          } else if (dig.detriment.includes(z.signName)) {
+            score -= 2;
+            breakdown.push({ text: "デトリメント -2", isPlus: false });
+          } else if (dig.exaltation.includes(z.signName)) {
+            score += 1;
+            breakdown.push({ text: "エグザルテーション +1", isPlus: true });
+          } else if (dig.fall.includes(z.signName)) {
+            score -= 1;
+            breakdown.push({ text: "フォール -1", isPlus: false });
+          }
+        }
+
         return {
           ...pt,
           ...z,
           isRetro,
           retroMark: isRetro ? "R" : "",
-          houseNum
+          houseNum,
+          score,
+          breakdown
         };
       });
 
-      // 3. アスペクト計算（※ここに点数の加算ロジックを追加できます）
+      // 3. アスペクト計算 ＆ 双方の天体へのスコア加算
       const aspects = [];
-      const aspectRules = [
-        { name: "Conjunction (合 / 0°)", angle: 0, orb: 7, color: "#60a5fa" },
-        { name: "Opposition (衝 / 180°)", angle: 180, orb: 7, color: "#f87171" },
-        { name: "Trine (三分 / 120°)", angle: 120, orb: 6, color: "#4ade80" },
-        { name: "Square (四分 / 90°)", angle: 90, orb: 6, color: "#fb923c" },
-        { name: "Sextile (六分 / 60°)", angle: 60, orb: 4.5, color: "#38bdf8" }
-      ];
-
       for (let i = 0; i < planets.length; i++) {
         for (let j = i + 1; j < planets.length; j++) {
           let diff = Math.abs(planets[i].total - planets[j].total);
           if (diff > 180) diff = 360 - diff;
-          for (const r of aspectRules) {
+
+          for (const r of ASPECT_RULES) {
             const orbVal = Math.abs(diff - r.angle);
-            if (orbVal <= r.orb) {
+            if (orbVal <= r.maxOrb) {
+              const pts = calcAspectScore(r.baseScore, orbVal);
+              const orbStr = orbVal.toFixed(1);
+
+              // 円盤描画用に記録
               aspects.push({
                 p1: planets[i].name,
                 p2: planets[j].name,
-                type: r.name,
-                orb: orbVal.toFixed(1),
                 color: r.color
               });
+
+              // 天体i と 天体j の両方に点数と内訳を追加
+              planets[i].score += pts;
+              planets[i].breakdown.push({
+                text: `${planets[j].name}との${r.shortName} (差${orbStr}°) +${pts}`,
+                isPlus: true
+              });
+
+              planets[j].score += pts;
+              planets[j].breakdown.push({
+                text: `${planets[i].name}との${r.shortName} (差${orbStr}°) +${pts}`,
+                isPlus: true
+              });
+
               break;
             }
           }
         }
       }
 
-      // 4. 4区分・3区分の集計と画面表示
+      // 4. 点数の高い順に並び替えてランキング表を描画
+      const rankedPlanets = [...planets].sort((a, b) => b.score - a.score);
+
+      document.getElementById("rankingTableBody").innerHTML = rankedPlanets.map((p, idx) => {
+        const rank = idx + 1;
+        const rankClass = rank === 1 ? "rank-1" : rank === 2 ? "rank-2" : rank === 3 ? "rank-3" : "";
+        const scoreFormatted = `${p.score > 0 ? "+" : ""}${Number(p.score.toFixed(2))} pt`;
+        const tagsHtml = p.breakdown.length > 0
+          ? p.breakdown.map(b => `<span class="${b.isPlus ? "tag-plus" : "tag-minus"}">${b.text}</span>`).join("")
+          : `<span class="tag-none">加点・減点なし</span>`;
+
+        return `
+          <tr>
+            <td><span class="rank-badge ${rankClass}">${rank}位</span></td>
+            <td>
+              <strong style="color:${p.color};">${p.symbol} ${p.name}</strong><br>
+              <span style="font-size:0.78rem; color:var(--text-muted);">${p.symbol === ZODIAC[p.signIdx].symbol ? "" : ZODIAC[p.signIdx].symbol}${p.signName} ${p.formatted}</span>
+            </td>
+            <td class="score-val">${scoreFormatted}</td>
+            <td><div class="breakdown-list">${tagsHtml}</div></td>
+          </tr>
+        `;
+      }).join("");
+
+      // 5. 4区分・3区分の集計と画面表示
       const elems = { "火": [], "地": [], "風": [], "水": [] };
-      const quals = { "活動": [], "固定": [], "柔軟": [] };
       planets.forEach(p => {
         elems[p.elem].push(`${p.symbol}${p.name}`);
-        quals[p.qual].push(`${p.symbol}${p.name}`);
       });
 
       document.getElementById("elementBox").innerHTML = `
-        <strong style="color: var(--gold-light);">✦ 4区分（エレメント）＆ 3区分（クオリティ）</strong>
+        <strong style="color: var(--gold-light);">✦ 4区分（エレメント）バランス</strong>
         <div class="elem-grid">
           <div>🔥 <strong>火 (${elems["火"].length}):</strong> ${elems["火"].join(" ") || "なし"}</div>
           <div>🌱 <strong>地 (${elems["地"].length}):</strong> ${elems["地"].join(" ") || "なし"}</div>
